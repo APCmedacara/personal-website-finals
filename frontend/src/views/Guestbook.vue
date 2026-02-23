@@ -71,7 +71,7 @@
 </template>
 
 <script>
-import { supabase } from '../supabase.js'
+const BACKEND_URL = 'https://personal-website-finals-bsq7.onrender.com'
 
 export default {
   name: 'Guestbook',
@@ -86,6 +86,17 @@ export default {
     }
   },
   methods: {
+    async fetchComments() {
+      this.loading = true
+      try {
+        const res = await fetch(`${BACKEND_URL}/guestbook`)
+        this.comments = await res.json()
+      } catch (e) {
+        this.errorMsg = 'Could not load messages.'
+      }
+      this.loading = false
+    },
+
     async submitComment() {
       this.successMsg = ''
       this.errorMsg = ''
@@ -97,41 +108,26 @@ export default {
 
       this.submitting = true
 
-      const { error } = await supabase.from('guestbook').insert([
-        {
-          name: this.form.name.trim(),
-          comment: this.form.comment.trim(),
-        },
-      ])
-
-      this.submitting = false
-
-      if (error) {
-        this.errorMsg = '❌ Failed to send: ' + error.message
-      } else {
+      try {
+        const res = await fetch(`${BACKEND_URL}/guestbook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: this.form.name.trim(),
+            comment: this.form.comment.trim(),
+          }),
+        })
+        if (!res.ok) throw new Error('Failed')
         this.successMsg = '🎉 Message sent! Thank you for signing my guestbook!'
         this.form.name = ''
         this.form.comment = ''
         await this.fetchComments()
-        // Clear success message after 5 seconds
         setTimeout(() => { this.successMsg = '' }, 5000)
+      } catch (e) {
+        this.errorMsg = '❌ Failed to send message. Please try again.'
       }
-    },
 
-    async fetchComments() {
-      this.loading = true
-      const { data, error } = await supabase
-        .from('guestbook')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      this.loading = false
-
-      if (error) {
-        this.errorMsg = 'Could not load messages. ' + error.message
-      } else {
-        this.comments = data
-      }
+      this.submitting = false
     },
 
     formatDate(dateStr) {
@@ -154,7 +150,6 @@ export default {
 <style scoped>
 .page-wrap { max-width: 700px; }
 
-/* FORM */
 .form-card { margin-bottom: 2.5rem; }
 .form-card h2 { color: var(--text); font-size: 1.2rem; margin-bottom: 1.25rem; }
 
@@ -221,7 +216,6 @@ export default {
 .success { color: #4ade80; }
 .error { color: #f87171; }
 
-/* COMMENTS */
 .comments-section h2 { color: var(--text); font-size: 1.1rem; margin-bottom: 1rem; }
 
 .loading-state, .empty-state {
@@ -270,12 +264,9 @@ export default {
 }
 
 .comment-meta strong { display: block; color: var(--text); font-size: 0.95rem; }
-
 .comment-date { color: var(--text-muted); font-size: 0.78rem; }
-
 .comment-text { color: #cbd5e1; line-height: 1.7; }
 
-/* Transition */
 .fade-enter-active, .fade-leave-active { transition: all 0.3s ease; }
 .fade-enter-from { opacity: 0; transform: translateY(-8px); }
 .fade-leave-to { opacity: 0; }
